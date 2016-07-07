@@ -1,0 +1,235 @@
+<!doctype html>
+<html>
+<head>
+	<meta charset="UTF-8">
+	<title>Snake Game in Javascript</title>
+	<link rel="icon" type="image/png" href="https://octodex.github.com/images/supportcat.png">
+	<style>
+		*{
+			padding: 0; margin:0; outline: none;
+		}
+		canvas {
+			display: block;
+			position: absolute;
+			border: 1px solid #ff0000;
+			margin: auto;
+			right: 0;
+			left: 0;
+		}
+		footer{
+	      width: 100%;
+	      background-color: #000000;
+	      bottom: 0;
+	      position: absolute;
+	      height: 30px;
+	      color: #FFFFFF;
+	      text-align: center;
+	      padding:20px 0;
+	      font-weight: bold;
+	      opacity: 0.9;
+				z-index: 999;
+	    }
+	    footer span{color: #E91E63; }
+	    footer a {color: #E91E63; text-decoration: none;}
+	</style>
+</head>
+<body>
+	<a href="https://github.com/FC-Lucas/snack-js" class="github-corner"><svg width="80" height="80" viewBox="0 0 250 250" style="fill:#151513; color:#fff; position: absolute; top: 0; border: 0; right: 0;"><path d="M0,0 L115,115 L130,115 L142,142 L250,250 L250,0 Z"></path><path d="M128.3,109.0 C113.8,99.7 119.0,89.6 119.0,89.6 C122.0,82.7 120.5,78.6 120.5,78.6 C119.2,72.0 123.4,76.3 123.4,76.3 C127.3,80.9 125.5,87.3 125.5,87.3 C122.9,97.6 130.6,101.9 134.4,103.2" fill="currentColor" style="transform-origin: 130px 106px;" class="octo-arm"></path><path d="M115.0,115.0 C114.9,115.1 118.7,116.5 119.8,115.4 L133.7,101.6 C136.9,99.2 139.9,98.4 142.2,98.6 C133.8,88.0 127.5,74.4 143.8,58.0 C148.5,53.4 154.0,51.2 159.7,51.0 C160.3,49.4 163.2,43.6 171.4,40.1 C171.4,40.1 176.1,42.5 178.8,56.2 C183.1,58.6 187.2,61.8 190.9,65.4 C194.5,69.0 197.7,73.2 200.1,77.6 C213.8,80.2 216.3,84.9 216.3,84.9 C212.7,93.1 206.9,96.0 205.4,96.6 C205.1,102.4 203.0,107.8 198.3,112.5 C181.9,128.9 168.3,122.5 157.7,114.1 C157.9,116.9 156.7,120.9 152.7,124.9 L141.0,136.5 C139.8,137.7 141.6,141.9 141.8,141.8 Z" fill="currentColor" class="octo-body"></path></svg></a><style>.github-corner:hover .octo-arm{animation:octocat-wave 560ms ease-in-out}@keyframes octocat-wave{0%,100%{transform:rotate(0)}20%,60%{transform:rotate(-25deg)}40%,80%{transform:rotate(10deg)}}@media (max-width:500px){.github-corner:hover .octo-arm{animation:none}.github-corner .octo-arm{animation:octocat-wave 560ms ease-in-out}}</style>
+	<footer>
+		<p>
+			Created With
+			<span>❤</span>
+			By
+			<a href="http://github.com/fc-lucas">FC Lucas</a>
+		</p>
+	</footer>
+<script>
+	var
+	COLS = 26,
+	ROWS = 26,
+	EMPTY = 0,
+	SNAKE = 1,
+	FRUIT = 2,
+	LEFT  = 0,
+	UP    = 1,
+	RIGHT = 2,
+	DOWN  = 3,
+	KEY_LEFT  = 37,
+	KEY_UP    = 38,
+	KEY_RIGHT = 39,
+	KEY_DOWN  = 40,
+
+	canvas,
+	ctx,
+	keystate,
+	frames,
+	score;
+
+	grid = {
+		width: null,
+		height: null,
+		_grid: null,
+
+		init: function(d, c, r) {
+			this.width = c;
+			this.height = r;
+			this._grid = [];
+			for (var x=0; x < c; x++) {
+				this._grid.push([]);
+				for (var y=0; y < r; y++) {
+					this._grid[x].push(d);
+				}
+			}
+		},
+
+		set: function(val, x, y) {
+			this._grid[x][y] = val;
+		},
+
+		get: function(x, y) {
+			return this._grid[x][y];
+		}
+	}
+
+	snake = {
+		direction: null,
+		last: null,
+		_queue: null,
+
+		init: function(d, x, y) {
+			this.direction = d;
+			this._queue = [];
+			this.insert(x, y);
+		},
+
+		insert: function(x, y) {
+			this._queue.unshift({x:x, y:y});
+			this.last = this._queue[0];
+		},
+
+		remove: function() {
+			return this._queue.pop();
+		}
+	};
+
+	function setFood() {
+		var empty = [];
+		for (var x=0; x < grid.width; x++) {
+			for (var y=0; y < grid.height; y++) {
+				if (grid.get(x, y) === EMPTY) {
+					empty.push({x:x, y:y});
+				}
+			}
+		}
+		var randpos = empty[Math.round(Math.random()*(empty.length - 1))];
+		grid.set(FRUIT, randpos.x, randpos.y);
+	}
+
+	function main() {
+		canvas = document.createElement("canvas");
+		canvas.width = COLS*20;
+		canvas.height = ROWS*20;
+		ctx = canvas.getContext("2d");
+		document.body.appendChild(canvas);
+		ctx.font = "12px BellMT";
+		frames = 0;
+		keystate = {};
+		document.addEventListener("keydown", function(evt) {
+			keystate[evt.keyCode] = true;
+		});
+		document.addEventListener("keyup", function(evt) {
+			delete keystate[evt.keyCode];
+		});
+		init();
+		loop();
+	}
+	function init() {
+		score = 0;
+		grid.init(EMPTY, COLS, ROWS);
+		var sp = {x:Math.floor(COLS/2), y:ROWS-1};
+		snake.init(UP, sp.x, sp.y);
+		grid.set(SNAKE, sp.x, sp.y);
+		setFood();
+	}
+
+	function loop() {
+		update();
+		draw();
+		window.requestAnimationFrame(loop, canvas);
+	}
+
+	function update() {
+		frames++;
+		if (keystate[KEY_LEFT] && snake.direction !== RIGHT) {
+			snake.direction = LEFT;
+		}
+		if (keystate[KEY_UP] && snake.direction !== DOWN) {
+			snake.direction = UP;
+		}
+		if (keystate[KEY_RIGHT] && snake.direction !== LEFT) {
+			snake.direction = RIGHT;
+		}
+		if (keystate[KEY_DOWN] && snake.direction !== UP) {
+			snake.direction = DOWN;
+		}
+
+		if (frames%5 === 0) {
+			var nx = snake.last.x;
+			var ny = snake.last.y;
+			switch (snake.direction) {
+				case LEFT:
+					nx--;
+					break;
+				case UP:
+					ny--;
+					break;
+				case RIGHT:
+					nx++;
+					break;
+				case DOWN:
+					ny++;
+					break;
+			}
+			if (0 > nx || nx > grid.width-1  ||
+				0 > ny || ny > grid.height-1 ||
+				grid.get(nx, ny) === SNAKE
+			) {
+				return init();
+			}
+			if (grid.get(nx, ny) === FRUIT) {
+				score++;
+				setFood();
+			} else {
+				var tail = snake.remove();
+				grid.set(EMPTY, tail.x, tail.y);
+			}
+			grid.set(SNAKE, nx, ny);
+			snake.insert(nx, ny);
+		}
+	}
+	function draw() {
+		var tw = canvas.width/grid.width;
+		var th = canvas.height/grid.height;
+		for (var x=0; x < grid.width; x++) {
+			for (var y=0; y < grid.height; y++) {
+				switch (grid.get(x, y)) {
+					case EMPTY:
+						ctx.fillStyle = "#000";
+						break;
+					case SNAKE:
+						ctx.fillStyle = "#fff";
+						break;
+					case FRUIT:
+						ctx.fillStyle = "#f25";
+						break;
+				}
+				ctx.fillRect(x*tw, y*th, tw, th);
+			}
+		}
+		ctx.fillStyle = "#fff";
+		ctx.fillText("SCORE: " + score, 10, canvas.height-10);
+	}
+	main();
+</script>
+</body>
+</html>
